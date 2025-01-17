@@ -134,7 +134,7 @@ def pseudo_input_profiling(
     
     M = macs/args.seq_len*args.sample_rate/args.batch_size if not args.as_string else "Not support --as_string"
     # summary
-    logger.info("summary, l = sequence length, bs = batch size, sr = sample rate\nsum of flops: {}\nsum of macs: {}\nparams: {} (nonzero: {nzparams})\nmacs/(l/sr)/bs: {}\n".format(flops, macs, params, M))
+    logger.info("summary, l = sequence length, bs = batch size, sr = sample rate\nsum of flops: {}\nsum of macs: {}\nparams: {} \nmacs/(l/sr)/bs: {}\n".format(flops, macs, params, M))
 
 
 def superb_profiling(

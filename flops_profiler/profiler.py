@@ -55,7 +55,7 @@ old_functions.update({
 # torch._C._nn
 old_functions.update({
     (torch._C._nn, func): False for func in [
-        "pad_sequence",
+        "pad_sequence", "pad",
         "reflection_pad1d", "reflection_pad2d", "reflection_pad3d",
         "replication_pad1d", "replication_pad2d", "replication_pad3d"
     ]
@@ -88,7 +88,7 @@ old_functions.update({
 old_functions.update({
     (torch, func): False for func in [
         # comparison
-        "eq", "ge", "gt", "le", "lt", "ne", "all", "any", "min", "max", "where", "isfinite", 
+        "eq", "ge", "gt", "le", "lt", "ne", "all", "any", "min", "max", "where", "isfinite", "is_floating_point"
         "greater_equal", "greater", "less_equal", "less", "not_equal", 
         # normalization, see QA.md for more detail
         "batch_norm", "group_norm", "instance_norm", "layer_norm", 
@@ -590,6 +590,23 @@ def _linear_flops_compute(input, weight, bias=None):
         
     return 2 * macs + bias_flop, macs
 
+def _scaled_dot_product_attention_flops_compute(query, key, value, *args, **kwargs):
+    # FLOP calculation for scaled dot-product attention
+    batch_size, num_heads, query_len, head_dim = query.shape
+    key_len = key.shape[-2]
+    value_len = value.shape[-2]
+    
+    # Compute QK^T (query-key product)
+    flops = 2 * batch_size * num_heads * query_len * key_len * head_dim
+    
+    # Add FLOPs for scaling, softmax, and weighted sum
+    flops += query_len * key_len  # scaling
+    flops += query_len * key_len * 3  # softmax
+    flops += query_len * key_len * head_dim  # weighted sum
+    
+    macs = flops // 2  # Multiply-accumulate operations
+    
+    return flops, macs
 
 def _xlu_flops_compute(input, *args, **kwargs):
     return input.numel(), 0
@@ -1164,6 +1181,13 @@ def _patch_nn_functionals():
     F.layer_norm = wrapFunc(F, F.layer_norm, "layer_norm", _layer_norm_flops_compute)    
     F.instance_norm = wrapFunc(F, F.instance_norm, "instance_norm", _instance_norm_flops_compute)
     F.group_norm = wrapFunc(F, F.group_norm, "group_norm", _group_norm_flops_compute)
+    F.scaled_dot_product_attention = wrapFunc(
+        F, 
+        F.scaled_dot_product_attention, 
+        "scaled_dot_product_attention", 
+        _scaled_dot_product_attention_flops_compute
+    )
+
 
     # poolings
     pools = map(lambda x: "".join(x), itertools.product(
